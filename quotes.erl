@@ -1,23 +1,28 @@
 -module(quotes).
+
 -record(quote, {key, symbol, timestamp, open, high, low, close, volume}).
--export([start/0, stop/0, do/1, processQuoteFiles/1, processQuoteFile/1, processLines/1]).
+
+-export([main/0, do/1, listSymbols/0, processQuoteFile/1, processLines/1]).
+
 -include_lib("stdlib/include/qlc.hrl").
+
 -compile(export_all).
 
-start() ->
+main() ->
 	mnesia:create_schema([node()]),
 	mnesia:start(),
 	mnesia:create_table(quote, [{attributes, record_info(fields, quote)}]),
+	mnesia:stop(),
+	
+	mnesia:start(),
 	mnesia:wait_for_tables([quote], 20000),
 	
-	Directory="C:/arbitData/ameritrade/quotes/",
-	Filenames=filelib:wildcard(lists:concat([Directory, "A/*.*"])),
-	processQuoteFiles(Filenames).
+	Filename="C:\\arbitData\\ameritrade\\quotes\\A\\20100325.csv",
+	processQuoteFile(Filename),
 		
-	%X=do(qlc:q([X || X <- mnesia:table(quote)])).
-	%erlang:display(X).
+	X=do(qlc:q([X || X <- mnesia:table(quote)])),
+	erlang:display(X),
 	
-stop() ->
 	mnesia:stop().
 
 do(Q) ->
@@ -25,14 +30,13 @@ do(Q) ->
 	{atomic,Val} = mnesia:transaction(F),
 	Val.
 
-processQuoteFiles(Filenames) ->
-	case Filenames of
-		[] -> ok;
-		Filenames ->
-			[Filename|FilenamesSublist]=Filenames,
-			erlang:display(lists:concat(["Loading ", Filename])),
-			processQuoteFile(Filename),
-			processQuoteFiles(FilenamesSublist)
+listSymbols() ->
+	Directory="C:\\arbitData\\ameritrade\\quotes\\",
+	case file:list_dir(Directory) of
+		{ok, Symbols} ->
+			Symbols;
+		{error, Reason} ->
+			Reason
 	end.
 
 processQuoteFile(Filename) ->
