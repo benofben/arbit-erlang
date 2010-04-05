@@ -1,20 +1,40 @@
 -module(quoteServer).
--export([start/1]).
+-export([start/0]).
 -record(quote, {key, symbol, timestamp, open, high, low, close, volume}).
 
-start(Symbol) ->
-	erlang:display(lists:concat(["quoteServer ", Symbol, ": Starting quote server."])),
-
+start() ->
+	erlang:display("quoteServer: Starting quote server..."),
+	
 	mnesia:start(),
 	mnesia:create_table(quote, [{attributes, record_info(fields, quote)}]),
 	mnesia:wait_for_tables([quote], 1000),
 
-	Wildcard=lists:concat(["C:/arbitData/ameritrade/quotes/", Symbol, "/*.*"]),
-	Filenames=filelib:wildcard(Wildcard),
-	processQuoteFiles(Filenames),
+	Symbols=listSymbols(),
+	%Symbols=["A","AA"],
+	processSymbols(Symbols),
 
-	erlang:display(lists:concat(["quoteServer ", Symbol, ": Done loading."])),
-	loop(Symbol).
+	erlang:display("quoteServer: Done loading.").
+
+listSymbols() ->
+	Directory="/home/ben/arbitData/ameritrade/quotes/",
+	case file:list_dir(Directory) of
+		{ok, Symbols} ->
+			Symbols
+	end.
+
+processSymbols(Symbols) ->
+	case Symbols of
+		[]->ok;
+		Symbols ->
+			[Symbol|SymbolsSublist]=Symbols,			
+			processSymbol(Symbol),
+			processSymbols(SymbolsSublist)
+	end.
+
+processSymbol(Symbol) ->
+	Wildcard=lists:concat(["/home/ben/arbitData/ameritrade/quotes/", Symbol, "/*.*"]),
+	Filenames=filelib:wildcard(Wildcard),
+	processQuoteFiles(Filenames).
 
 processQuoteFiles(Filenames) ->
 	case Filenames of
@@ -55,12 +75,4 @@ processLines(IODevice) ->
 			  end,
 			mnesia:transaction(F),
 			processLines(IODevice)
-	end.
-
-loop (Symbol) ->
-	receive
-		Other ->
-			erlang:display(lists:concat(["quoteServer ", Symbol, ": Unknown request."])),
-			erlang:display(lists:concat(["quoteServer ", Symbol, ": ", Other])),
-			loop(Symbol)
 	end.
